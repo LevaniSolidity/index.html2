@@ -1,0 +1,1590 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>USDC Staking | ArcReserve</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --color-primary: #3b82f6;
+      --color-primary-dark: #2563eb;
+      --color-success: #10b981;
+      --color-warning: #f59e0b;
+      --color-danger: #ef4444;
+      --glass-bg: rgba(15, 23, 42, 0.65);
+      --glass-border: rgba(148, 163, 184, 0.15);
+      --glass-highlight: rgba(255, 255, 255, 0.05);
+      --glow-blue: rgba(59, 130, 246, 0.3);
+      --glow-emerald: rgba(16, 185, 129, 0.25);
+    }
+
+    * { font-family: 'Sora', sans-serif; box-sizing: border-box; }
+
+    body {
+      background: #050b14;
+      color: #e2e8f0;
+      position: relative;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(59, 130, 246, 0.15), transparent 40%),
+        radial-gradient(circle at 85% 30%, rgba(16, 185, 129, 0.1), transparent 40%),
+        radial-gradient(circle at 50% 100%, rgba(139, 92, 246, 0.1), transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container-wrapper { position: relative; z-index: 1; padding-bottom: 100px; }
+    .mono { font-family: 'IBM Plex Mono', monospace; }
+
+    .card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      box-shadow:
+        0 4px 24px -1px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .card:hover {
+      border-color: rgba(59, 130, 246, 0.4);
+      box-shadow:
+        0 20px 40px -10px rgba(0, 0, 0, 0.5),
+        0 0 20px -5px var(--glow-blue),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      transform: translateY(-4px);
+    }
+
+    .glass-input {
+      background: rgba(10, 15, 30, 0.6);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 16px 20px;
+      color: #f8fafc;
+      font-size: 16px;
+      transition: all 0.3s ease;
+      font-family: 'IBM Plex Mono', monospace;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .glass-input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      background: rgba(15, 23, 42, 0.9);
+      box-shadow:
+        0 0 0 4px rgba(59, 130, 246, 0.15),
+        inset 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .btn {
+      padding: 16px 32px;
+      border-radius: 16px;
+      font-weight: 600;
+      font-size: 15px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: none;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      letter-spacing: 0.5px;
+    }
+
+    .btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.1), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .btn:hover::after { opacity: 1; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+      color: white;
+      box-shadow: 0 10px 25px -5px var(--glow-blue);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 35px -5px var(--glow-blue);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      box-shadow: 0 10px 25px -5px var(--glow-emerald);
+    }
+
+    .btn-success:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 35px -5px var(--glow-emerald);
+    }
+
+    .btn-outline {
+      background: rgba(59, 130, 246, 0.05);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #60a5fa;
+    }
+
+    .btn-outline:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: #60a5fa;
+      color: white;
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #f87171;
+    }
+
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: #f87171;
+      color: white;
+    }
+
+    .btn[disabled] {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    .stat-card {
+      background: linear-gradient(160deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 24px;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    }
+
+    .stat-card:hover {
+      border-color: rgba(59, 130, 246, 0.3);
+      transform: translateY(-4px);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #f1f5f9;
+      font-family: 'IBM Plex Mono', monospace;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+
+    .stat-value.highlight {
+      background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3));
+    }
+
+    .tab {
+      padding: 14px 28px;
+      background: transparent;
+      border: none;
+      color: #64748b;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.3s ease;
+    }
+
+    .tab:hover { color: #cbd5e1; }
+    .tab.active { color: #f8fafc; text-shadow: 0 0 10px rgba(255,255,255,0.3); }
+
+    .tab::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 20%; right: 20%;
+      height: 3px;
+      background: linear-gradient(90deg, var(--color-primary), var(--color-success));
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+      border-radius: 999px;
+      box-shadow: 0 0 10px var(--glow-blue);
+    }
+
+    .tab.active::after { transform: scaleX(1); }
+
+    .wallet-btn {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 14px;
+      padding: 12px 24px;
+      color: #60a5fa;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: 'IBM Plex Mono', monospace;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .wallet-btn:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: #60a5fa;
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+      color: white;
+    }
+
+    .connected {
+      background: rgba(16, 185, 129, 0.1);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-in { animation: slideIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+    .animate-in:nth-child(1) { animation-delay: 0.1s; }
+    .animate-in:nth-child(2) { animation-delay: 0.2s; }
+    .animate-in:nth-child(3) { animation-delay: 0.3s; }
+    .animate-in:nth-child(4) { animation-delay: 0.4s; }
+
+    .corner-branding {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 50;
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 16px 24px;
+      border-radius: 20px;
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+      animation: floatBrand 6s ease-in-out infinite;
+      transition: transform 0.3s ease;
+    }
+
+    .corner-branding:hover {
+      transform: scale(1.05);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+
+    .corner-branding span {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #60a5fa 0%, #34d399 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      display: block;
+      text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    }
+
+    @keyframes floatBrand {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    #walletModal .card {
+      background: #0f172a;
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #3b82f6;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+      transition: transform 0.2s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+    .input-invalid {
+      border-color: rgba(239, 68, 68, 0.8) !important;
+      box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12), inset 0 2px 4px rgba(0,0,0,0.3) !important;
+    }
+
+    .input-valid { border-color: rgba(16, 185, 129, 0.55) !important; }
+
+    .skeleton { position: relative; overflow: hidden; }
+    .skeleton::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+      animation: shimmer 1.2s infinite;
+    }
+
+    @keyframes shimmer { 100% { transform: translateX(100%); } }
+
+    @media (max-width: 640px) {
+      .btn { padding: 14px 16px; font-size: 14px; }
+      .stat-value { font-size: 22px; }
+      .card { border-radius: 18px; }
+      .glass-input { padding: 14px 16px; font-size: 15px; }
+      .corner-branding {
+        right: 12px;
+        bottom: 12px;
+        padding: 10px 14px;
+        border-radius: 14px;
+      }
+      .corner-branding span { font-size: 11px; letter-spacing: 1px; }
+      #walletModal .card { margin: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container-wrapper">
+    <div class="max-w-7xl mx-auto px-4 py-8 md:py-12">
+      <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-12 animate-in">
+        <div>
+          <h1 id="mainTitle" class="text-4xl md:text-5xl font-bold mb-2 text-white drop-shadow-lg">
+            USDC <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Staking</span>
+          </h1>
+          <p id="mainSubtitle" class="text-slate-400 text-lg">Stake USDC, earn EURC rewards instantly</p>
+        </div>
+        <div class="flex items-center gap-4">
+          <button id="btnConnect" class="wallet-btn" onclick="openWalletModal()">
+            <span id="walletAddress">Connect Wallet</span>
+          </button>
+        </div>
+      </header>
+
+      <div id="txStatus" class="card p-4 mb-8 animate-in" style="animation-delay: 0.1s;">
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-slate-300 font-medium">Ready to interact</span>
+          <span class="text-xs mono text-slate-500" id="lastUpdate">Last update: --</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div class="stat-card animate-in" style="animation-delay: 0.2s;">
+          <div class="stat-label">Total Value Locked</div>
+          <div class="stat-value highlight" id="kpiTotalStaked">$0</div>
+          <div class="text-xs text-slate-500 mt-2 mono" id="kpiTotalStakedTokenLine">0 USDC</div>
+        </div>
+
+        <div class="stat-card animate-in" style="animation-delay: 0.3s;">
+          <div class="stat-label">Your Stake</div>
+          <div class="stat-value" id="kpiYourStake">$0</div>
+          <div class="text-xs text-slate-500 mt-2 mono" id="kpiYourStakeTokenLine">0 USDC</div>
+        </div>
+
+        <div class="stat-card animate-in" style="animation-delay: 0.4s;">
+          <div class="stat-label">Current APR</div>
+          <div class="stat-value text-emerald-400" id="kpiApr">0%</div>
+          <div class="text-xs text-slate-500 mt-2" id="kpiAprSub">Dynamic Rate</div>
+        </div>
+
+        <div class="stat-card animate-in" style="animation-delay: 0.5s;">
+          <div class="stat-label">Claimable Rewards</div>
+          <div class="stat-value text-blue-400" id="kpiLiveEarned">$0</div>
+          <div class="text-xs text-slate-500 mt-2 mono" id="kpiLiveEarnedTokenLine">0 EURC</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-2 space-y-6">
+          <div class="card p-2 animate-in flex justify-around md:justify-start" style="animation-delay: 0.6s;">
+            <button class="tab active" data-tab="stake">Stake</button>
+            <button class="tab" data-tab="unstake">Unstake</button>
+            <button class="tab" data-tab="claim">Claim</button>
+          </div>
+
+          <div id="zeroStateCard" class="card p-5 hidden">
+            <div class="text-sm font-semibold text-white mb-1">Pool status</div>
+            <div id="zeroStateMessage" class="text-sm text-slate-400">
+              Waiting for reward epoch and first stake...
+            </div>
+          </div>
+
+          <div class="card p-8 animate-in" style="animation-delay: 0.7s;" id="tabStake">
+            <h3 class="text-2xl font-bold mb-6 text-white" id="stakeTabTitle">Stake USDC</h3>
+
+            <div class="mb-6">
+              <div class="flex justify-between items-center mb-3">
+                <label class="text-sm font-semibold text-slate-300">Amount</label>
+                <div class="text-sm text-slate-400">
+                  Available: <span class="mono font-semibold text-slate-200" id="kpiWalletBal">0</span> <span id="stakeSymbolInline1">USDC</span>
+                </div>
+              </div>
+
+              <div class="relative">
+                <input type="text" id="stakeAmount" placeholder="0.00" class="glass-input w-full pr-24 text-2xl font-bold" />
+                <button id="btnStakeMax" class="absolute right-3 top-1/2 -translate-y-1/2 px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-xl text-xs font-bold transition uppercase tracking-wider border border-blue-500/30">
+                  MAX
+                </button>
+              </div>
+              <div id="stakeInputError" class="mt-2 text-xs text-red-400 hidden"></div>
+              <div id="stakeInputHint" class="mt-2 text-xs text-slate-500">
+                Enter amount in <span id="stakeSymbolInlineHint1">USDC</span>
+              </div>
+
+              <div class="flex gap-2 mt-4">
+                <button class="quick-amount flex-1 py-2 text-xs font-bold text-slate-400 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-blue-500/50 hover:text-white transition" data-percent="25">25%</button>
+                <button class="quick-amount flex-1 py-2 text-xs font-bold text-slate-400 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-blue-500/50 hover:text-white transition" data-percent="50">50%</button>
+                <button class="quick-amount flex-1 py-2 text-xs font-bold text-slate-400 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-blue-500/50 hover:text-white transition" data-percent="75">75%</button>
+              </div>
+            </div>
+
+            <div class="h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent my-6"></div>
+
+            <div class="space-y-3 mb-8">
+              <div class="flex justify-between text-sm">
+                <span class="text-slate-400">You are staking</span>
+                <span class="mono font-semibold text-white" id="stakeAmountDisplay">0 USDC</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-slate-400">Est. daily rewards</span>
+                <span class="mono font-semibold text-emerald-400" id="estDailyRewards">~0 EURC</span>
+              </div>
+              <div class="flex justify-between text-xs">
+                <span class="text-slate-500">Current APR</span>
+                <span class="mono text-slate-400" id="stakeTabApr">0%</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <button id="btnApprove" class="btn btn-outline w-full">Approve</button>
+              <button id="btnStake" class="btn btn-success w-full">Confirm Stake</button>
+            </div>
+          </div>
+
+          <div class="card p-8 hidden" id="tabUnstake">
+            <h3 class="text-2xl font-bold mb-6 text-white" id="unstakeTabTitle">Unstake USDC</h3>
+
+            <div class="mb-6">
+              <div class="flex justify-between items-center mb-3">
+                <label class="text-sm font-semibold text-slate-300">Amount</label>
+                <div class="text-sm text-slate-400">
+                  Staked: <span class="mono font-semibold text-slate-200" id="stakedBal">0</span> <span id="stakeSymbolInline2">USDC</span>
+                </div>
+              </div>
+
+              <input type="text" id="withdrawAmount" placeholder="0.00" class="glass-input w-full text-2xl font-bold mb-2" />
+              <div id="withdrawInputError" class="mt-2 text-xs text-red-400 hidden"></div>
+              <div id="withdrawInputHint" class="mt-2 text-xs text-slate-500">
+                Max unstake: <span id="unstakeMaxHint" class="mono">0</span> <span id="stakeSymbolInlineHint2">USDC</span>
+              </div>
+
+              <div class="flex gap-2 mt-4">
+                <button class="quick-unstake flex-1 py-2 text-xs font-bold text-slate-400 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-blue-500/50 hover:text-white transition" data-percent="25">25%</button>
+                <button class="quick-unstake flex-1 py-2 text-xs font-bold text-slate-400 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-blue-500/50 hover:text-white transition" data-percent="50">50%</button>
+                <button class="quick-unstake flex-1 py-2 text-xs font-bold text-slate-400 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-blue-500/50 hover:text-white transition" data-percent="75">75%</button>
+                <button class="quick-unstake flex-1 py-2 text-xs font-bold text-slate-400 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-blue-500/50 hover:text-white transition" data-percent="100">MAX</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mt-4">
+              <button id="btnWithdraw" class="btn btn-primary w-full">
+                Withdraw <span id="stakeSymbolBtnWithdraw">USDC</span>
+              </button>
+              <button id="btnEmergencyWithdraw" class="btn btn-danger w-full">
+                Emergency Exit
+              </button>
+            </div>
+            <p class="text-xs text-slate-500 mt-3 text-center">⚠️ Emergency Exit — reward-ები იკარგება, მხოლოდ stake-ი ბრუნდება</p>
+          </div>
+
+          <div class="card p-8 hidden" id="tabClaim">
+            <h3 class="text-2xl font-bold mb-6 text-white">Claim Rewards</h3>
+
+            <div class="text-center py-10 mb-6 bg-slate-800/30 rounded-2xl border border-slate-700/30">
+              <div class="text-sm text-slate-400 mb-3 uppercase tracking-widest font-bold">Unclaimed Balance</div>
+              <div class="text-5xl font-bold mb-4 mono text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 drop-shadow-sm" id="claimAmount">0</div>
+              <div class="text-slate-400 font-medium" id="rewardSymbolInline1">EURC</div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <button id="btnClaim" class="btn btn-success w-full">Claim Rewards</button>
+              <button id="btnExit" class="btn btn-outline w-full">Exit & Claim</button>
+            </div>
+          </div>
+
+          <div class="card p-6 animate-in" style="animation-delay: 0.8s;">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h4 class="font-semibold mb-1 text-white">Reward Epoch</h4>
+                <p class="text-sm text-slate-400">
+                  <span id="epochEndsIn" class="mono text-blue-300">--</span> remaining
+                </p>
+              </div>
+              <div id="pausedBadge" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</div>
+            </div>
+
+            <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div id="epochProgress" class="h-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-1000" style="width: 0%"></div>
+            </div>
+
+            <div class="flex justify-between mt-3 text-xs text-slate-500 font-medium">
+              <span>Duration: <span id="epochDuration" class="mono text-slate-400">0s</span></span>
+              <span>Rate: <span id="kpiRewardRate" class="mono text-slate-400">0</span> <span id="rewardSymbolInline2">EURC</span>/s</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-6">
+          <div class="card p-6 animate-in" style="animation-delay: 0.9s;">
+            <h4 class="font-semibold mb-6 text-white border-b border-slate-700/50 pb-4">ROI Calculator</h4>
+
+            <div class="mb-6">
+              <div class="flex justify-between mb-3">
+                <label class="text-sm text-slate-400">Time Period</label>
+                <span id="projectionLabel" class="text-sm text-blue-400 font-bold">1 day</span>
+              </div>
+              <input type="range" id="projectionSeconds" min="3600" max="604800" step="3600" value="86400" />
+            </div>
+
+            <div class="space-y-4">
+              <div class="bg-slate-900/40 rounded-xl p-4 border border-slate-700/30">
+                <div class="text-xs text-slate-400 mb-1 uppercase tracking-wider">Projected Yield</div>
+                <div class="text-2xl font-bold mono text-white" id="calcProjectedReward">0</div>
+                <div class="text-xs text-slate-500 mt-1" id="rewardSymbolInline3">EURC</div>
+              </div>
+
+              <div class="bg-slate-900/40 rounded-xl p-4 border border-slate-700/30">
+                <div class="text-xs text-slate-400 mb-1 uppercase tracking-wider">Return %</div>
+                <div class="text-2xl font-bold mono text-emerald-400" id="calcProjectedPct">0%</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card p-6 animate-in" style="animation-delay: 1s;">
+            <h4 class="font-semibold mb-4 text-white">Reward Growth</h4>
+            <div class="h-[200px]"><canvas id="rewardChart"></canvas></div>
+          </div>
+
+          <div id="ownerPanel" class="card p-6 hidden border-yellow-500/30 bg-yellow-900/10">
+            <h4 class="font-semibold mb-4 text-amber-400 flex items-center gap-2">
+              <span>⚡ Admin Controls</span>
+            </h4>
+
+            <div class="space-y-4">
+              <div>
+                <label class="text-xs text-slate-400 mb-2 block uppercase">Notify Reward</label>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <input type="text" id="notifyAmount" placeholder="Amount" class="glass-input sm:col-span-2 !p-2 !text-sm" />
+                  <button id="btnApproveReward" class="btn btn-outline !py-2 !px-4 !text-sm">Approve Reward</button>
+                </div>
+                <div id="notifyInputError" class="mt-2 text-xs text-red-400 hidden"></div>
+                <div id="notifyInputHint" class="mt-2 text-xs text-slate-500">
+                  Enter reward amount in <span id="rewardSymbolInlineHint1">EURC</span>
+                </div>
+                <button id="btnNotify" class="btn btn-primary w-full !py-2 !px-4 !text-sm mt-2">Add Reward</button>
+              </div>
+
+              <div>
+                <label class="text-xs text-slate-400 mb-2 block uppercase">Duration (sec)</label>
+                <div class="flex gap-2">
+                  <input type="number" id="setDuration" placeholder="604800" class="glass-input flex-1 !p-2 !text-sm" />
+                  <button id="btnSetDuration" class="btn btn-primary !py-2 !px-4 !text-sm">Set</button>
+                </div>
+                <div id="durationInputError" class="mt-2 text-xs text-red-400 hidden"></div>
+                <div id="durationInputHint" class="mt-2 text-xs text-slate-500">
+                  Common values: 86400 (1 day), 604800 (7 days)
+                </div>
+              </div>
+
+              <div>
+                <label class="text-xs text-slate-400 mb-2 block uppercase">StakeFor Access</label>
+                <div class="flex gap-2 items-center">
+                  <div id="stakeForOpenBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700">Closed</div>
+                  <button id="btnToggleStakeForOpen" class="btn btn-outline !py-2 !px-4 !text-sm flex-1">Toggle Open/Closed</button>
+                </div>
+              </div>
+
+              <button id="btnPauseToggle" class="btn btn-outline w-full !text-sm !py-3 border-amber-500/50 text-amber-500 hover:bg-amber-500/20">
+                Pause Protocol
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="walletModal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden items-center justify-center z-[100]" onclick="closeWalletModal(event)">
+    <div class="card max-w-sm w-full mx-4 p-6 shadow-2xl border-slate-700" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-xl font-bold text-white">Connect Wallet</h3>
+        <button onclick="closeWalletModal()" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+
+      <div class="space-y-3">
+        <button onclick="connectMetaMask()" class="w-full flex items-center gap-4 p-4 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-blue-500 transition group text-left">
+          <div class="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-500 font-bold">M</div>
+          <div>
+            <div class="font-semibold text-white group-hover:text-blue-400 transition">MetaMask</div>
+            <div class="text-xs text-slate-400">Browser Extension</div>
+          </div>
+        </button>
+
+        <button onclick="connectWalletConnect()" class="w-full flex items-center gap-4 p-4 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-blue-500 transition group text-left">
+          <div class="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 font-bold">W</div>
+          <div>
+            <div class="font-semibold text-white group-hover:text-blue-400 transition">WalletConnect</div>
+            <div class="text-xs text-slate-400">Mobile Scan</div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="corner-branding"><span>ArcReserve</span></div>
+
+<script>
+(() => {
+  // ── UPDATED: ახალი კონტრაქტის ადრესი ──
+  const CONTRACT_ADDRESS = "0x3994D0Edc275DeE8b936Fb284441B8e9D2b6bFbC";
+  const YEAR_SECONDS = 31536000;
+  const MAX_UINT256 = (1n << 256n) - 1n;
+
+  // ── UPDATED: ახალი ABI — emergencyWithdraw, setApprovedStaker, setStakeForOpen, stakeForOpen, approvedStakers დამატებულია ──
+  const STAKING_ABI = [
+    {"inputs":[{"internalType":"address","name":"stakingToken_","type":"address"},{"internalType":"address","name":"rewardsToken_","type":"address"},{"internalType":"uint256","name":"rewardsDuration_","type":"uint256"},{"internalType":"address","name":"initialOwner_","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},
+    {"inputs":[],"name":"CannotRecoverCoreToken","type":"error"},
+    {"inputs":[],"name":"InsufficientBalance","type":"error"},
+    {"inputs":[],"name":"InvalidDuration","type":"error"},
+    {"inputs":[],"name":"NotApprovedStaker","type":"error"},
+    {"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},
+    {"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},
+    {"inputs":[],"name":"ReentrancyGuardReentrantCall","type":"error"},
+    {"inputs":[],"name":"RewardPeriodNotFinished","type":"error"},
+    {"inputs":[],"name":"RewardRateTooHigh","type":"error"},
+    {"inputs":[],"name":"RewardTooSmall","type":"error"},
+    {"inputs":[],"name":"SameTokenNotAllowed","type":"error"},
+    {"inputs":[],"name":"UnsupportedToken","type":"error"},
+    {"inputs":[],"name":"ZeroAddress","type":"error"},
+    {"inputs":[],"name":"ZeroAmount","type":"error"},
+    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"staker","type":"address"},{"indexed":false,"internalType":"bool","name":"approved","type":"bool"}],"name":"ApprovedStakerSet","type":"event"},
+    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"EmergencyWithdrawn","type":"event"},
+    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferStarted","type":"event"},
+    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},
+    {"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Paused","type":"event"},
+    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"token","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Recovered","type":"event"},
+    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"reward","type":"uint256"}],"name":"RewardPaid","type":"event"},
+    {"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"reward","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"rewardRate","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"periodFinish","type":"uint256"}],"name":"RewardNotified","type":"event"},
+    {"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newDuration","type":"uint256"}],"name":"RewardsDurationUpdated","type":"event"},
+    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"staker","type":"address"},{"indexed":true,"internalType":"address","name":"beneficiary","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"StakedFor","type":"event"},
+    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Staked","type":"event"},
+    {"anonymous":false,"inputs":[{"indexed":false,"internalType":"bool","name":"open","type":"bool"}],"name":"StakeForOpenSet","type":"event"},
+    {"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Unpaused","type":"event"},
+    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Withdrawn","type":"event"},
+    {"inputs":[],"name":"acceptOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"approvedStakers","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"earned","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"emergencyWithdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[],"name":"exit","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[],"name":"getReward","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[],"name":"lastTimeRewardApplicable","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"lastUpdateTime","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"uint256","name":"reward","type":"uint256"}],"name":"notifyRewardAmount","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"pendingOwner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"periodFinish","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"recoverERC20","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[],"name":"remainingRewardTime","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[],"name":"rewardForDuration","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"rewardPerToken","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"rewardPerTokenStored","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"rewardRate","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"rewardTokenBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"rewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"rewardsDuration","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"rewardsToken","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"staker","type":"address"},{"internalType":"bool","name":"approved","type":"bool"}],"name":"setApprovedStaker","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[{"internalType":"uint256","name":"newDuration","type":"uint256"}],"name":"setRewardsDuration","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[{"internalType":"bool","name":"open","type":"bool"}],"name":"setStakeForOpen","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"stake","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[{"internalType":"address","name":"beneficiary","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"stakeFor","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[],"name":"stakeForOpen","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"stakingToken","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"stakingTokenBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[],"name":"unpause","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"userRewardPerTokenPaid","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"}
+  ];
+
+  const ERC20_ABI = [
+    "function symbol() view returns (string)",
+    "function decimals() view returns (uint8)",
+    "function balanceOf(address) view returns (uint256)",
+    "function allowance(address,address) view returns (uint256)",
+    "function approve(address,uint256) returns (bool)"
+  ];
+
+  let provider, signer, account;
+  let staking, stakeToken, rewardToken;
+  let refreshInterval, uiInterval, rewardChart;
+
+  const meta = {
+    stakeSymbol: "USDC",
+    rewardSymbol: "EURC",
+    stakeDecimals: 6,
+    rewardDecimals: 6,
+    owner: null
+  };
+
+  const state = {
+    totalSupply: 0n,
+    rewardRate: 0n,
+    rewardsDuration: 0n,
+    periodFinish: 0n,
+    paused: false,
+    stakeForOpen: false,
+    userStake: 0n,
+    chainEarned: 0n,
+    allowance: 0n,
+    walletStakeBal: 0n,
+    chainSyncTs: 0,
+    isOwner: false
+  };
+
+  const ui = {
+    isRefreshing: false,
+    txPending: false
+  };
+
+  const defaultBtnText = new Map();
+
+  const $ = (id) => document.getElementById(id);
+
+  [
+    "btnApprove","btnStake","btnWithdraw","btnEmergencyWithdraw","btnClaim","btnExit",
+    "btnApproveReward","btnNotify","btnSetDuration","btnPauseToggle","btnToggleStakeForOpen"
+  ].forEach(id => {
+    const el = $(id);
+    if (el) defaultBtnText.set(id, el.innerHTML);
+  });
+
+  function shortAddr(addr) {
+    return addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "Connect Wallet";
+  }
+
+  function setTxStatus(msg) {
+    $("txStatus").innerHTML = `
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-slate-300 font-medium">${msg}</span>
+        <span class="text-xs mono text-slate-500">${new Date().toLocaleTimeString()}</span>
+      </div>
+    `;
+  }
+
+  function parseError(err) {
+    return err?.shortMessage || err?.reason || err?.info?.error?.message || err?.message || "Unknown error";
+  }
+
+  function formatToken(raw, decimals, maxFrac = 2) {
+    try {
+      const num = Number(ethers.formatUnits(raw ?? 0n, decimals));
+      return num.toLocaleString(undefined, { maximumFractionDigits: maxFrac, minimumFractionDigits: 2 });
+    } catch {
+      return "0.00";
+    }
+  }
+
+  function parseAmount(text, decimals) {
+    const trimmed = text?.trim();
+    if (!trimmed || isNaN(Number(trimmed)) || Number(trimmed) <= 0) {
+      throw new Error("Enter valid amount > 0");
+    }
+    return ethers.parseUnits(trimmed, decimals);
+  }
+
+  function formatDuration(seconds) {
+    const s = Math.max(0, Number(seconds || 0));
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h ${m}m`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  }
+
+  function ensureConnected() {
+    if (!staking || !account) throw new Error("Connect wallet first");
+  }
+
+  function setButtonLoading(id, loading, label = "Processing...") {
+    const btn = $(id);
+    if (!btn) return;
+    if (!defaultBtnText.has(id)) defaultBtnText.set(id, btn.innerHTML);
+    btn.disabled = !!loading;
+    if (loading) {
+      btn.innerHTML = `<span class="inline-flex items-center gap-2">
+        <span class="w-3 h-3 rounded-full border-2 border-white/40 border-t-white inline-block animate-spin"></span>
+        <span>${label}</span>
+      </span>`;
+    } else {
+      btn.innerHTML = defaultBtnText.get(id);
+    }
+  }
+
+  function setFieldError(inputId, errorId, message) {
+    const input = $(inputId);
+    const error = $(errorId);
+    if (!input || !error) return;
+    input.classList.remove("input-valid");
+    if (message) {
+      input.classList.add("input-invalid");
+      error.textContent = message;
+      error.classList.remove("hidden");
+    } else {
+      input.classList.remove("input-invalid");
+      error.textContent = "";
+      error.classList.add("hidden");
+    }
+  }
+
+  function setFieldValid(inputId, errorId) {
+    const input = $(inputId);
+    const error = $(errorId);
+    if (!input || !error) return;
+    input.classList.remove("input-invalid");
+    input.classList.add("input-valid");
+    error.textContent = "";
+    error.classList.add("hidden");
+  }
+
+  function clearFieldState(inputId, errorId) {
+    const input = $(inputId);
+    const error = $(errorId);
+    if (!input || !error) return;
+    input.classList.remove("input-invalid", "input-valid");
+    error.textContent = "";
+    error.classList.add("hidden");
+  }
+
+  function safeNumFromInput(id) {
+    const v = ($(id)?.value || "").trim();
+    if (!v) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : NaN;
+  }
+
+  function applyTokenLabels() {
+    document.title = `${meta.stakeSymbol} Staking | ArcReserve`;
+    $("mainTitle").innerHTML = `${meta.stakeSymbol} <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Staking</span>`;
+    $("mainSubtitle").textContent = `Stake ${meta.stakeSymbol}, earn ${meta.rewardSymbol} rewards instantly`;
+
+    $("stakeTabTitle").textContent = `Stake ${meta.stakeSymbol}`;
+    $("unstakeTabTitle").textContent = `Unstake ${meta.stakeSymbol}`;
+
+    $("stakeSymbolInline1").textContent = meta.stakeSymbol;
+    $("stakeSymbolInline2").textContent = meta.stakeSymbol;
+    $("stakeSymbolBtnWithdraw").textContent = meta.stakeSymbol;
+
+    $("rewardSymbolInline1").textContent = meta.rewardSymbol;
+    $("rewardSymbolInline2").textContent = meta.rewardSymbol;
+    $("rewardSymbolInline3").textContent = meta.rewardSymbol;
+
+    $("stakeSymbolInlineHint1") && ($("stakeSymbolInlineHint1").textContent = meta.stakeSymbol);
+    $("stakeSymbolInlineHint2") && ($("stakeSymbolInlineHint2").textContent = meta.stakeSymbol);
+    $("rewardSymbolInlineHint1") && ($("rewardSymbolInlineHint1").textContent = meta.rewardSymbol);
+  }
+
+  function rewardPerSecondRaw() {
+    if (state.totalSupply === 0n) return 0n;
+    return (state.rewardRate * state.userStake) / state.totalSupply;
+  }
+
+  function liveEarnedRaw() {
+    let base = state.chainEarned || 0n;
+    const now = Math.floor(Date.now() / 1000);
+    const finish = Number(state.periodFinish || 0n);
+
+    if (state.chainSyncTs === 0 || state.userStake === 0n || state.totalSupply === 0n) return base;
+
+    const end = Math.min(now, finish);
+    const elapsed = Math.max(0, end - state.chainSyncTs);
+
+    if (elapsed > 0) base += rewardPerSecondRaw() * BigInt(elapsed);
+    return base;
+  }
+
+  function calculateRewardMetrics(seconds) {
+    const sec = Math.max(1, Number(seconds || 1));
+    const rps = rewardPerSecondRaw();
+    const projectedRaw = rps * BigInt(sec);
+    const projectedReward = Number(ethers.formatUnits(projectedRaw, meta.rewardDecimals));
+    const stakeAmount = Number(ethers.formatUnits(state.userStake || 0n, meta.stakeDecimals));
+    const percentOfStake = stakeAmount > 0 ? (projectedReward / stakeAmount) * 100 : 0;
+    const pctPerSec = stakeAmount > 0 ? (Number(ethers.formatUnits(rps, meta.rewardDecimals)) / stakeAmount) * 100 : 0;
+    return { projectedRaw, projectedReward, percentOfStake, pctPerSec };
+  }
+
+  function validateStakeInput() {
+    const n = safeNumFromInput("stakeAmount");
+    const max = Number(ethers.formatUnits(state.walletStakeBal || 0n, meta.stakeDecimals));
+
+    if (n === null) { clearFieldState("stakeAmount", "stakeInputError"); return false; }
+    if (Number.isNaN(n)) { setFieldError("stakeAmount", "stakeInputError", "Invalid number"); return false; }
+    if (n <= 0) { setFieldError("stakeAmount", "stakeInputError", "Amount must be greater than 0"); return false; }
+    if (n > max) { setFieldError("stakeAmount", "stakeInputError", `Insufficient ${meta.stakeSymbol} balance`); return false; }
+
+    setFieldValid("stakeAmount", "stakeInputError");
+    return true;
+  }
+
+  function validateWithdrawInput() {
+    const n = safeNumFromInput("withdrawAmount");
+    const max = Number(ethers.formatUnits(state.userStake || 0n, meta.stakeDecimals));
+
+    if (n === null) { clearFieldState("withdrawAmount", "withdrawInputError"); return false; }
+    if (Number.isNaN(n)) { setFieldError("withdrawAmount", "withdrawInputError", "Invalid number"); return false; }
+    if (n <= 0) { setFieldError("withdrawAmount", "withdrawInputError", "Amount must be greater than 0"); return false; }
+    if (n > max) { setFieldError("withdrawAmount", "withdrawInputError", "Amount exceeds staked balance"); return false; }
+
+    setFieldValid("withdrawAmount", "withdrawInputError");
+    return true;
+  }
+
+  function validateNotifyInput() {
+    const n = safeNumFromInput("notifyAmount");
+    if (n === null) { clearFieldState("notifyAmount", "notifyInputError"); return false; }
+    if (Number.isNaN(n)) { setFieldError("notifyAmount", "notifyInputError", "Invalid number"); return false; }
+    if (n <= 0) { setFieldError("notifyAmount", "notifyInputError", "Reward amount must be greater than 0"); return false; }
+    setFieldValid("notifyAmount", "notifyInputError");
+    return true;
+  }
+
+  function validateDurationInput() {
+    const raw = ($("setDuration")?.value || "").trim();
+    if (!raw) { clearFieldState("setDuration", "durationInputError"); return false; }
+    const sec = Number(raw);
+    if (!Number.isFinite(sec) || sec <= 0 || !Number.isInteger(sec)) { setFieldError("setDuration", "durationInputError", "Duration must be a positive integer (seconds)"); return false; }
+    if (sec < 3600) { setFieldError("setDuration", "durationInputError", "Too short. Use at least 3600 seconds (1 hour)"); return false; }
+    setFieldValid("setDuration", "durationInputError");
+    return true;
+  }
+
+  function updateZeroState(nowTs) {
+    const zeroCard = $("zeroStateCard");
+    const zeroMsg = $("zeroStateMessage");
+    if (!zeroCard || !zeroMsg) return;
+
+    const hasStake = (state.totalSupply || 0n) > 0n;
+    const hasRewardRate = (state.rewardRate || 0n) > 0n;
+    const finish = Number(state.periodFinish || 0n);
+    const epochActive = finish > nowTs;
+
+    let message = "";
+    let show = false;
+
+    if (!hasRewardRate && !hasStake) {
+      show = true;
+      message = `No active reward epoch yet and no ${meta.stakeSymbol} staked. Owner should approve + notify ${meta.rewardSymbol}, then users can stake.`;
+    } else if (!hasRewardRate && hasStake) {
+      show = true;
+      message = `Users have staked ${meta.stakeSymbol}, but no reward epoch is configured. Owner needs to notify ${meta.rewardSymbol} rewards.`;
+    } else if (hasRewardRate && !epochActive) {
+      show = true;
+      message = `Reward epoch has ended. Owner can start a new epoch by notifying more ${meta.rewardSymbol}.`;
+    } else if (hasRewardRate && !hasStake) {
+      show = true;
+      message = `Reward epoch is active, but no one is staking yet. First staker will start earning immediately.`;
+    }
+
+    zeroCard.classList.toggle("hidden", !show);
+    zeroMsg.textContent = message || "";
+  }
+
+  async function doTx(label, txFn, buttonId = null) {
+    try {
+      ui.txPending = true;
+      if (buttonId) setButtonLoading(buttonId, true, "Awaiting signature...");
+      setTxStatus(`${label} • awaiting signature...`);
+
+      const tx = await txFn();
+
+      if (buttonId) setButtonLoading(buttonId, true, "Pending...");
+      setTxStatus(`${label} • pending: ${tx.hash.slice(0, 10)}...`);
+
+      await tx.wait();
+
+      setTxStatus(`${label} • success ✅`);
+      await refreshData();
+    } catch (err) {
+      setTxStatus(`${label} • failed: ${parseError(err)}`);
+    } finally {
+      ui.txPending = false;
+      if (buttonId) setButtonLoading(buttonId, false);
+    }
+  }
+
+  window.openWalletModal = function() {
+    $("walletModal").classList.remove("hidden");
+    $("walletModal").classList.add("flex");
+  };
+
+  window.closeWalletModal = function(event) {
+    if (!event || event.target.id === "walletModal" || event.target.tagName === "BUTTON") {
+      $("walletModal").classList.add("hidden");
+      $("walletModal").classList.remove("flex");
+    }
+  };
+
+  async function initializeWallet(walletProvider) {
+    try {
+      provider = new ethers.BrowserProvider(walletProvider);
+      await provider.send("eth_requestAccounts", []);
+      signer = await provider.getSigner();
+      account = await signer.getAddress();
+
+      staking = new ethers.Contract(CONTRACT_ADDRESS, STAKING_ABI, signer);
+
+      const [stakeAddr, rewardAddr, ownerAddr] = await Promise.all([
+        staking.stakingToken(),
+        staking.rewardsToken(),
+        staking.owner()
+      ]);
+
+      stakeToken = new ethers.Contract(stakeAddr, ERC20_ABI, signer);
+      rewardToken = new ethers.Contract(rewardAddr, ERC20_ABI, signer);
+
+      const [stakeSymbol, rewardSymbol, stakeDecimals, rewardDecimals] = await Promise.all([
+        stakeToken.symbol(),
+        rewardToken.symbol(),
+        stakeToken.decimals(),
+        rewardToken.decimals()
+      ]);
+
+      meta.stakeSymbol = stakeSymbol;
+      meta.rewardSymbol = rewardSymbol;
+      meta.stakeDecimals = Number(stakeDecimals);
+      meta.rewardDecimals = Number(rewardDecimals);
+      meta.owner = ownerAddr;
+
+      state.isOwner = account.toLowerCase() === ownerAddr.toLowerCase();
+
+      applyTokenLabels();
+
+      $("walletAddress").textContent = shortAddr(account);
+      $("btnConnect").classList.add("connected");
+      $("ownerPanel").classList.toggle("hidden", !state.isOwner);
+
+      setTxStatus("Connected successfully • Loading data...");
+      await refreshData();
+
+      if (refreshInterval) clearInterval(refreshInterval);
+      if (uiInterval) clearInterval(uiInterval);
+
+      refreshInterval = setInterval(refreshData, 12000);
+      uiInterval = setInterval(render, 1000);
+
+      closeWalletModal();
+
+      walletProvider.on?.("accountsChanged", () => location.reload());
+      walletProvider.on?.("chainChanged", () => location.reload());
+    } catch (err) {
+      setTxStatus(`Connection failed: ${parseError(err)}`);
+      closeWalletModal();
+    }
+  }
+
+  window.connectMetaMask = async function() {
+    try {
+      if (!window.ethereum) { alert("MetaMask not found. Please install MetaMask extension."); return; }
+      await initializeWallet(window.ethereum);
+    } catch (err) {
+      setTxStatus(`MetaMask connection failed: ${parseError(err)}`);
+    }
+  };
+
+  window.connectWalletConnect = async function() {
+    alert("WalletConnect requires a Project ID. Add your WalletConnect integration here.");
+  };
+
+  async function refreshData() {
+    try {
+      if (!staking || !account) return;
+
+      if (!ui.isRefreshing) {
+        ui.isRefreshing = true;
+        $("txStatus")?.classList.add("skeleton");
+      }
+
+      const [
+        totalSupply, rewardRate, rewardsDuration, periodFinish, paused,
+        stakeForOpen, userStake, chainEarned, allowance, walletStakeBal
+      ] = await Promise.all([
+        staking.totalSupply(),
+        staking.rewardRate(),
+        staking.rewardsDuration(),
+        staking.periodFinish(),
+        staking.paused(),
+        staking.stakeForOpen(),
+        staking.balanceOf(account),
+        staking.earned(account),
+        stakeToken.allowance(account, CONTRACT_ADDRESS),
+        stakeToken.balanceOf(account)
+      ]);
+
+      state.totalSupply = totalSupply;
+      state.rewardRate = rewardRate;
+      state.rewardsDuration = rewardsDuration;
+      state.periodFinish = periodFinish;
+      state.paused = paused;
+      state.stakeForOpen = stakeForOpen;
+      state.userStake = userStake;
+      state.chainEarned = chainEarned;
+      state.allowance = allowance;
+      state.walletStakeBal = walletStakeBal;
+      state.chainSyncTs = Math.floor(Date.now() / 1000);
+
+      $("lastUpdate").textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+      render();
+    } catch (err) {
+      console.error("Refresh error:", err);
+      setTxStatus(`Refresh error: ${parseError(err)}`);
+    } finally {
+      ui.isRefreshing = false;
+      $("txStatus")?.classList.remove("skeleton");
+    }
+  }
+
+  function render() {
+    const now = Math.floor(Date.now() / 1000);
+    const finish = Number(state.periodFinish || 0n);
+    const remaining = Math.max(0, finish - now);
+
+    const isActiveEpoch = finish > now;
+    const activeRewardRateRaw = isActiveEpoch ? (state.rewardRate || 0n) : 0n;
+
+    const totalStakedNum = Number(ethers.formatUnits(state.totalSupply || 0n, meta.stakeDecimals));
+    const rewardRateNum = Number(ethers.formatUnits(activeRewardRateRaw, meta.rewardDecimals));
+    const apr = totalStakedNum > 0 ? (rewardRateNum * YEAR_SECONDS / totalStakedNum) * 100 : 0;
+    const dailyPct = apr / 365;
+
+    const liveEarned = liveEarnedRaw();
+
+    const duration = Number(state.rewardsDuration || 0n);
+    const elapsed = Math.max(0, duration - remaining);
+    const progress = duration > 0 ? Math.min(100, (elapsed / duration) * 100) : 0;
+    $("epochProgress").style.width = `${progress}%`;
+
+    $("kpiTotalStaked").textContent = `$${formatToken(state.totalSupply, meta.stakeDecimals)}`;
+    $("kpiYourStake").textContent = `$${formatToken(state.userStake, meta.stakeDecimals)}`;
+    $("kpiWalletBal").textContent = formatToken(state.walletStakeBal, meta.stakeDecimals);
+    $("stakedBal").textContent = formatToken(state.userStake, meta.stakeDecimals);
+
+    $("kpiTotalStakedTokenLine").textContent = `${formatToken(state.totalSupply, meta.stakeDecimals)} ${meta.stakeSymbol}`;
+    $("kpiYourStakeTokenLine").textContent = `${formatToken(state.userStake, meta.stakeDecimals)} ${meta.stakeSymbol}`;
+
+    $("kpiRewardRate").textContent = formatToken(activeRewardRateRaw, meta.rewardDecimals, 6);
+    $("kpiLiveEarned").textContent = `$${formatToken(liveEarned, meta.rewardDecimals)}`;
+    $("claimAmount").textContent = formatToken(liveEarned, meta.rewardDecimals);
+    $("kpiLiveEarnedTokenLine").textContent = `${formatToken(liveEarned, meta.rewardDecimals)} ${meta.rewardSymbol}`;
+
+    if (state.totalSupply === 0n) {
+      $("kpiApr").textContent = "--";
+      $("kpiAprSub").textContent = `APR appears after users stake ${meta.stakeSymbol}`;
+    } else if (!isActiveEpoch || activeRewardRateRaw === 0n) {
+      $("kpiApr").textContent = "0.00% APR";
+      $("kpiAprSub").textContent = `No active ${meta.rewardSymbol} reward epoch`;
+    } else {
+      $("kpiApr").textContent = `${apr.toFixed(2)}% APR`;
+      $("kpiAprSub").textContent = `${dailyPct.toFixed(4)}% / day`;
+    }
+
+    $("epochDuration").textContent = `${duration}s`;
+    $("epochEndsIn").textContent = formatDuration(remaining);
+
+    const pausedBadge = $("pausedBadge");
+    if (state.paused) {
+      pausedBadge.textContent = "Paused";
+      pausedBadge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/20";
+    } else {
+      pausedBadge.textContent = "Active";
+      pausedBadge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+    }
+
+    $("unstakeMaxHint") && ($("unstakeMaxHint").textContent = formatToken(state.userStake, meta.stakeDecimals));
+
+    // StakeFor Open/Closed badge
+    const sfBadge = $("stakeForOpenBadge");
+    if (sfBadge) {
+      if (state.stakeForOpen) {
+        sfBadge.textContent = "Open (ყველა)";
+        sfBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-emerald-900/30 text-emerald-400 border border-emerald-500/30";
+      } else {
+        sfBadge.textContent = "Closed (whitelist)";
+        sfBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700";
+      }
+    }
+
+    // Pause button label
+    const pauseBtn = $("btnPauseToggle");
+    if (pauseBtn) pauseBtn.textContent = state.paused ? "Unpause Protocol" : "Pause Protocol";
+
+    updateZeroState(now);
+    recalcProjection();
+    updateStakePreview();
+
+    validateStakeInput();
+    validateWithdrawInput();
+    validateNotifyInput();
+    validateDurationInput();
+  }
+
+  function recalcProjection() {
+    const seconds = Number($("projectionSeconds").value || 86400);
+
+    const hours = seconds / 3600;
+    const days = seconds / 86400;
+    if (days >= 1) $("projectionLabel").textContent = `${days.toFixed(1)} days`;
+    else $("projectionLabel").textContent = `${hours.toFixed(1)} hours`;
+
+    const metrics = calculateRewardMetrics(seconds);
+    $("calcProjectedReward").textContent = metrics.projectedReward.toFixed(4);
+    $("calcProjectedPct").textContent = `${metrics.percentOfStake.toFixed(4)}%`;
+
+    updateChart(seconds);
+  }
+
+  function updateChart(seconds) {
+    const ctx = $("rewardChart");
+    if (!ctx) return;
+
+    const points = 20;
+    const step = Math.max(1, Math.floor(seconds / points));
+
+    const labels = [];
+    const values = [];
+
+    const base = Number(ethers.formatUnits(liveEarnedRaw(), meta.rewardDecimals));
+    const rpsRaw = rewardPerSecondRaw();
+    const rps = Number(ethers.formatUnits(rpsRaw, meta.rewardDecimals));
+
+    for (let s = 0; s <= seconds; s += step) {
+      const hours = s / 3600;
+      labels.push(hours.toFixed(1));
+      values.push(base + (rps * s));
+    }
+
+    if (!rewardChart) {
+      Chart.defaults.color = '#64748b';
+      Chart.defaults.font.family = 'IBM Plex Mono';
+
+      rewardChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            label: "Rewards",
+            data: values,
+            tension: 0.4,
+            fill: true,
+            borderColor: "#3b82f6",
+            backgroundColor: (context) => {
+              const c = context.chart.ctx;
+              const gradient = c.createLinearGradient(0, 0, 0, 200);
+              gradient.addColorStop(0, "rgba(59, 130, 246, 0.2)");
+              gradient.addColorStop(1, "rgba(59, 130, 246, 0)");
+              return gradient;
+            },
+            borderWidth: 3,
+            pointRadius: 0,
+            pointHoverRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: "rgba(15, 23, 42, 0.9)",
+              titleColor: "#e2e8f0",
+              bodyColor: "#3b82f6",
+              borderColor: "rgba(59, 130, 246, 0.2)",
+              borderWidth: 1,
+              padding: 12,
+              displayColors: false,
+              callbacks: {
+                label: (ctx) => `+ ${ctx.parsed.y.toFixed(4)} ${meta.rewardSymbol}`
+              }
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 6 } },
+            y: { grid: { color: "rgba(148,163,184,0.1)" }, border: { display: false } }
+          }
+        }
+      });
+    } else {
+      rewardChart.data.labels = labels;
+      rewardChart.data.datasets[0].data = values;
+      rewardChart.update("none");
+    }
+  }
+
+  function updateStakePreview() {
+    const inputAmount = $("stakeAmount").value || "0";
+    const amount = parseFloat(inputAmount) || 0;
+
+    $("stakeAmountDisplay").textContent = `${amount.toFixed(2)} ${meta.stakeSymbol}`;
+
+    const now = Math.floor(Date.now() / 1000);
+    const finish = Number(state.periodFinish || 0n);
+    const isActiveEpoch = finish > now;
+    const activeRewardRateRaw = isActiveEpoch ? (state.rewardRate || 0n) : 0n;
+
+    const totalStakedNum = Number(ethers.formatUnits(state.totalSupply || 0n, meta.stakeDecimals));
+    const rewardRateNum = Number(ethers.formatUnits(activeRewardRateRaw, meta.rewardDecimals));
+    const apr = totalStakedNum > 0 ? (rewardRateNum * YEAR_SECONDS / totalStakedNum) * 100 : 0;
+
+    const dailyRate = apr / 365 / 100;
+    const dailyRewards = amount * dailyRate;
+
+    $("estDailyRewards").textContent = `~${dailyRewards.toFixed(4)} ${meta.rewardSymbol}`;
+    $("stakeTabApr").textContent = totalStakedNum > 0 && isActiveEpoch ? `${apr.toFixed(2)}% APR (${(apr / 365).toFixed(4)}%/day)` : `0.00% APR`;
+  }
+
+  // Tab switching
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+
+      const targetTab = tab.dataset.tab;
+      $("tabStake").classList.add("hidden");
+      $("tabUnstake").classList.add("hidden");
+      $("tabClaim").classList.add("hidden");
+
+      if (targetTab === "stake") $("tabStake").classList.remove("hidden");
+      if (targetTab === "unstake") $("tabUnstake").classList.remove("hidden");
+      if (targetTab === "claim") $("tabClaim").classList.remove("hidden");
+    });
+  });
+
+  // Input listeners
+  $("stakeAmount")?.addEventListener("input", () => { validateStakeInput(); updateStakePreview(); });
+  $("withdrawAmount")?.addEventListener("input", () => validateWithdrawInput());
+  $("notifyAmount")?.addEventListener("input", () => validateNotifyInput());
+  $("setDuration")?.addEventListener("input", () => validateDurationInput());
+
+  document.querySelectorAll(".quick-amount").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const percent = Number(btn.dataset.percent);
+      const balance = Number(ethers.formatUnits(state.walletStakeBal, meta.stakeDecimals));
+      const amount = (balance * percent / 100).toFixed(meta.stakeDecimals);
+      $("stakeAmount").value = amount;
+      validateStakeInput(); updateStakePreview();
+    });
+  });
+
+  document.querySelectorAll(".quick-unstake").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const percent = Number(btn.dataset.percent);
+      const balance = Number(ethers.formatUnits(state.userStake, meta.stakeDecimals));
+      const amount = (balance * percent / 100).toFixed(meta.stakeDecimals);
+      $("withdrawAmount").value = amount;
+      validateWithdrawInput();
+    });
+  });
+
+  $("btnStakeMax").addEventListener("click", () => {
+    const balance = Number(ethers.formatUnits(state.walletStakeBal, meta.stakeDecimals));
+    $("stakeAmount").value = balance.toFixed(meta.stakeDecimals);
+    validateStakeInput(); updateStakePreview();
+  });
+
+  // Button handlers
+  $("btnApprove").addEventListener("click", async () => {
+    try {
+      ensureConnected();
+      await doTx(`Approve ${meta.stakeSymbol}`, () => stakeToken.approve(CONTRACT_ADDRESS, MAX_UINT256), "btnApprove");
+    } catch (err) {
+      setTxStatus(`Approve failed: ${parseError(err)}`);
+    }
+  });
+
+  $("btnStake").addEventListener("click", async () => {
+    try {
+      ensureConnected();
+      if (!validateStakeInput()) throw new Error("Fix stake amount");
+      const amt = parseAmount($("stakeAmount").value, meta.stakeDecimals);
+
+      if (state.allowance < amt) {
+        setTxStatus(`Approving ${meta.stakeSymbol} first...`);
+        setButtonLoading("btnStake", true, "Approving...");
+        const txA = await stakeToken.approve(CONTRACT_ADDRESS, MAX_UINT256);
+        await txA.wait();
+        setButtonLoading("btnStake", false);
+      }
+
+      await doTx(`Stake ${meta.stakeSymbol}`, () => staking.stake(amt), "btnStake");
+    } catch (err) {
+      setButtonLoading("btnStake", false);
+      setTxStatus(`Stake failed: ${parseError(err)}`);
+    }
+  });
+
+  $("btnWithdraw").addEventListener("click", async () => {
+    try {
+      ensureConnected();
+      if (!validateWithdrawInput()) throw new Error("Fix withdraw amount");
+      const amt = parseAmount($("withdrawAmount").value, meta.stakeDecimals);
+      await doTx(`Withdraw ${meta.stakeSymbol}`, () => staking.withdraw(amt), "btnWithdraw");
+    } catch (err) {
+      setTxStatus(`Withdraw failed: ${parseError(err)}`);
+    }
+  });
+
+  // Emergency Withdraw — ახალი ბუთონი
+  $("btnEmergencyWithdraw").addEventListener("click", async () => {
+    try {
+      ensureConnected();
+      const confirmed = confirm("⚠️ Emergency Withdraw: reward-ები სამუდამოდ იკარგება. დარწმუნებული ხარ?");
+      if (!confirmed) return;
+      await doTx("Emergency Withdraw", () => staking.emergencyWithdraw(), "btnEmergencyWithdraw");
+    } catch (err) {
+      setTxStatus(`Emergency Withdraw failed: ${parseError(err)}`);
+    }
+  });
+
+  $("btnClaim").addEventListener("click", async () => {
+    try {
+      ensureConnected();
+      await doTx(`Claim ${meta.rewardSymbol}`, () => staking.getReward(), "btnClaim");
+    } catch (err) {
+      setTxStatus(`Claim failed: ${parseError(err)}`);
+    }
+  });
+
+  $("btnExit").addEventListener("click", async () => {
+    try {
+      ensureConnected();
+      await doTx("Exit", () => staking.exit(), "btnExit");
+    } catch (err) {
+      setTxStatus(`Exit failed: ${parseError(err)}`);
+    }
+  });
+
+  $("btnApproveReward").addEventListener("click", async () => {
+    try {
+      ensureConnected();
+      if (!state.isOwner) throw new Error("Owner only");
+      if (!validateNotifyInput()) throw new Error("Fix reward amount");
+      const amt = parseAmount($("notifyAmount").value, meta.rewardDecimals);
+      await doTx(`Approve ${meta.rewardSymbol} Reward`, () => rewardToken.approve(CONTRACT_ADDRESS, amt), "btnApproveReward");
+    } catch (err) {
+      setTxStatus(`Reward approve failed: ${parseError(err)}`);
+    }
+  });
+
+  $("btnNotify").addEventListener("click", async () => {
+    try {
+      ensureConnected();
+      if (!state.isOwner) throw new Error("Owner only");
+      if (!validateNotifyInput()) throw new Error("Fix reward amount");
+      const amt = parseAmount($("notifyAmount").value, meta.rewardDecimals);
+      await doTx(`Notify ${meta.rewardSymbol} Reward`, () => staking.notifyRewardAmount(amt), "btnNotify");
+    } catch (err) {
+      setTxStatus(`Notify failed: ${parseError(err)}`);
+    }
+  });
+
+  $("btnSetDuration").addEventListener("click", async () => {
+    try {
+      ensureConnected();
+      if (!state.isOwner) throw new Error("Owner only");
+      if (!validateDurationInput()) throw new Error("Fix duration");
+      const sec = Number($("setDuration").value);
+      await doTx("Set Duration", () => staking.setRewardsDuration(BigInt(sec)), "btnSetDuration");
+    } catch (err) {
+      setTxStatus(`Set Duration failed: ${parseError(err)}`);
+    }
+  });
+
+  // Toggle stakeForOpen — ახალი ბუთონი
+  $("btnToggleStakeForOpen").addEventListener("click", async () => {
+    try {
+      ensureConnected();
+      if (!state.isOwner) throw new Error("Owner only");
+      const newVal = !state.stakeForOpen;
+      await doTx(`StakeFor: ${newVal ? "Open" : "Closed"}`, () => staking.setStakeForOpen(newVal), "btnToggleStakeForOpen");
+    } catch (err) {
+      setTxStatus(`Toggle StakeFor failed: ${parseError(err)}`);
+    }
+  });
+
+  $("btnPauseToggle").addEventListener("click", async () => {
+    try {
+      ensureConnected();
+      if (!state.isOwner) throw new Error("Owner only");
+      await doTx(state.paused ? "Unpause" : "Pause", () => state.paused ? staking.unpause() : staking.pause(), "btnPauseToggle");
+    } catch (err) {
+      setTxStatus(`Toggle failed: ${parseError(err)}`);
+    }
+  });
+
+  $("projectionSeconds").addEventListener("input", recalcProjection);
+
+  applyTokenLabels();
+  render();
+  updateStakePreview();
+})();
+</script>
+</body>
+</html>
